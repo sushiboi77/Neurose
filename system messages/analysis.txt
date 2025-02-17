@@ -6,7 +6,9 @@ State clearly the main functionality of the indicator, and then the accompanying
 
 Avoid mentioning trivial and standard side features like customizable inputs and alerts as we want the script writing assistant to focus on the main features.
 
-Focus on features that the used of the indicator will experience first hand, try not to mention backend or internal features that does not directly add to the user experience and functionality.
+Focus on features that the used of the indicator will experience first hand, try not to mention backend or internal features that does not directly add to the user experience and functionality. Do this by paying attention to the display and visualization logic of the code to accurately understand what is actually displayed to the user.
+
+When listing the features, rank them in order of uniqueness and significance, for example, if the main identity of the indicator is a price forecast, then list the price forecast feature first along with the next most important features. Avoid ranking common features that almost all other indicators have like customizable inputs and alerts.
 
 Your analysis will be given to a script writing assistant that will write a script on the basis of your analysis.
 

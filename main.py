@@ -23,19 +23,44 @@ def get_embedding(text):
     )
     return response.data[0].embedding
 
+def load_used_hooks():
+    """Load previously used hooks from file"""
+    try:
+        with open('used_hooks.json', 'r', encoding='utf-8') as f:
+            return set(json.load(f))
+    except FileNotFoundError:
+        return set()
+
+def save_used_hooks(hook):
+    """Save only the last used hook to file"""
+    with open('used_hooks.json', 'w', encoding='utf-8') as f:
+        json.dump([hook], f, ensure_ascii=False, indent=2)
+
 def get_top_hooks(analysis_text, num_hooks=5):
+    # Load previously used hooks
+    used_hooks = load_used_hooks()
+    
     analysis_embedding = get_embedding(analysis_text)
     
     with open('hook_embeddings.json', 'r', encoding='utf-8') as f:
         hook_embeddings = json.load(f)
     
+    # Calculate similarities and filter out used hooks
     similarities = []
     for hook_data in hook_embeddings:
-        similarity = cosine_similarity(analysis_embedding, hook_data['embedding'])
-        similarities.append((hook_data['hook'], similarity))
+        if hook_data['hook'] not in used_hooks:  # Skip previously used hooks
+            similarity = cosine_similarity(analysis_embedding, hook_data['embedding'])
+            similarities.append((hook_data['hook'], similarity))
     
+    # Sort by similarity and get top N
     similarities.sort(key=lambda x: x[1], reverse=True)
-    return [hook for hook, _ in similarities[:num_hooks]]
+    selected_hooks = [hook for hook, _ in similarities[:num_hooks]]
+    
+    # Update used hooks
+    used_hooks.update(selected_hooks)
+    save_used_hooks(selected_hooks[-1])
+    
+    return selected_hooks
 
 def analyze_code(pinescript_code):
     with open('system messages/analysis.txt', 'r', encoding='utf-8') as file:
@@ -56,6 +81,27 @@ def analyze_code(pinescript_code):
     print(Fore.BLUE + analysis + Style.RESET_ALL)
     print('-'*50)
     return analysis
+
+def detect_used_hook(output_text, provided_hooks):
+    """Detect which hook was used in the output by comparing embeddings"""
+    # Extract the hook from the output (text between [Hook] and [Body])
+    try:
+        hook_text = output_text.split("[Hook]")[1].split("[Body]")[0].strip()
+        hook_embedding = get_embedding(hook_text)
+        
+        # Compare with the 5 provided hooks
+        similarities = []
+        for hook in provided_hooks:
+            hook_embedding_compare = get_embedding(hook)
+            similarity = cosine_similarity(hook_embedding, hook_embedding_compare)
+            similarities.append((hook, similarity))
+        
+        # Return the hook with highest similarity
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        return similarities[0][0]  # Return the most similar hook
+    except Exception as e:
+        print(f"Error detecting used hook: {e}")
+        return None
 
 def generate_script():
     # Load both parts of the system message
@@ -98,7 +144,7 @@ def generate_script():
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": full_prompt}
             ],
-            temperature=0.7, # Increased temperature for more creative responses
+            temperature=0.7,
             stream=True
         )
 
@@ -115,6 +161,14 @@ def generate_script():
                 full_response += content
         
         print("\n" + "-" * 50)
+
+        # Detect which hook was used and save it
+        used_hook = detect_used_hook(full_response, top_hooks)
+        if used_hook:
+            print(f"\nDetected Used Hook:\n{'-'*50}")
+            print(Fore.YELLOW + used_hook + Style.RESET_ALL)
+            print('-'*50)
+            save_used_hooks(used_hook)
 
     except Exception as e:
         print(f"An error occurred: {e}")
