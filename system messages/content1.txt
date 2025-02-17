@@ -1,0 +1,20 @@
+Guidelines for Body:
+- Keep this portion short, 3 sentences max. (totalling around 30 seconds of narration maximum)
+- Describe the main key features in their own short sentences.
+- Leave an empty line after each feature to help the narrator pace the delivery (IMPORTANT)
+- Use a simple explanation of how the features work. For instance, you might say 'it uses smoothing techniques to create a fast, ultra-smooth moving average line.'
+- Go straight into explaining the features, with no need for introductions or conclusions about the indicator.
+- Use straightforward statements that simply state the feature. Avoid extra qualifying phrases such as "empowering you" or "allowing you."
+- Avoid technical jargon and do not mention the indicator’s name or its creator.
+- Write the script in a continuous manner, instead of isolated, unrelated sentences. When moving on to the next feature, you can use continuation phrases like 'it/this indicator also...' or 'On top of that...' to make it sound more connected.
+- Keep the entire explanation brief—aim for a narration time of about 20 seconds. You do not need to mention every feature, just 2-3 of the main features.
+
+Guidelines for Payoff:
+- Write a single payoff line exactly as follows: "You can find this indicator on TradingView by searching <name of indicator without the [AlgoAlpha] portion> by <[Author]>."
+
+General Guidelines:
+- Address the viewer directly using "you."
+- Use plain but engaging, short sentences.
+- Avoid clichés, hype, and overly promotional language ('let’s dive right in', 'Without further ado', 'But wait', 'there’s more', 'Let’s unpack this further', 'In today’s fast-paced world', 'Have you ever wondered', etc.).
+- Be direct and concise, cutting out unnecessary words.
+- Do not include extra explanatory clauses like "[...], making potential trade opportunities easy to spot" or "[...], providing actionable insights."
