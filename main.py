@@ -27,18 +27,25 @@ def load_used_hooks():
     """Load previously used hooks from file"""
     try:
         with open('used_hooks.json', 'r', encoding='utf-8') as f:
-            return set(json.load(f))
+            return json.load(f)  # Returns list of hooks
     except FileNotFoundError:
-        return set()
+        return []
 
 def save_used_hooks(hook):
-    """Save only the last used hook to file"""
+    """Save the new hook while maintaining last 5 hooks"""
+    used_hooks = load_used_hooks()
+    used_hooks.append(hook)
+    
+    # Keep only the last 5 hooks
+    if len(used_hooks) > 5:
+        used_hooks = used_hooks[-5:]
+        
     with open('used_hooks.json', 'w', encoding='utf-8') as f:
-        json.dump([hook], f, ensure_ascii=False, indent=2)
+        json.dump(used_hooks, f, ensure_ascii=False, indent=2)
 
 def get_top_hooks(analysis_text, num_hooks=5):
     # Load previously used hooks
-    used_hooks = load_used_hooks()
+    used_hooks = set(load_used_hooks())  # Convert to set for faster lookup
     
     analysis_embedding = get_embedding(analysis_text)
     
@@ -55,10 +62,6 @@ def get_top_hooks(analysis_text, num_hooks=5):
     # Sort by similarity and get top N
     similarities.sort(key=lambda x: x[1], reverse=True)
     selected_hooks = [hook for hook, _ in similarities[:num_hooks]]
-    
-    # Update used hooks
-    used_hooks.update(selected_hooks)
-    save_used_hooks(selected_hooks[-1])
     
     return selected_hooks
 
@@ -103,6 +106,24 @@ def detect_used_hook(output_text, provided_hooks):
         print(f"Error detecting used hook: {e}")
         return None
 
+def shorten_script(incomplete_script, analysis):
+    """Use another agent to shorten the script if it's too long"""
+    with open('system messages/shorterner.txt', 'r', encoding='utf-8') as file:
+        shortener_system_message = file.read()
+    
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": shortener_system_message},
+            {"role": "user", "content": f"Incomplete script:\n{incomplete_script}\n\nAnalysis:\n{analysis}"}
+        ],
+        temperature=0.1,
+        max_tokens=112,
+        stream=False
+    )
+    
+    return response.choices[0].message.content
+
 def generate_script():
     # Load both parts of the system message
     with open('system messages/content.txt', 'r', encoding='utf-8') as file:
@@ -110,12 +131,16 @@ def generate_script():
     with open('system messages/content1.txt', 'r', encoding='utf-8') as file:
         content_part2 = file.read()
     
-    # Get user input
+    # Get user inputs
     print("Enter your PineScript code (press Enter when done):")
     pinescript_code = input().strip()
     
+    print("\nEnter a description of your indicator (press Enter when done):")
+    description = input().strip()
+    
     # Step 1: Get analysis from first agent
-    analysis = analyze_code(pinescript_code)
+    combined_input = f"Code:\n{pinescript_code}\n\nDescription:\n{description}"
+    analysis = analyze_code(combined_input)
     
     # Step 2: Get top 5 relevant hooks
     top_hooks = get_top_hooks(analysis)
@@ -131,13 +156,12 @@ def generate_script():
     print("-"*50)
     
     # Print the full prompt that will be sent to the second agent
-    full_prompt = f"Analysis:\n{analysis}\n\nCode:\n{pinescript_code}"
+    full_prompt = f"Analysis:\n{analysis}\n\nCode:\n{pinescript_code}\n\nDescription:\n{description}"
     print("\nFull Prompt to Second Agent:\n" + "-"*50)
     print(Fore.YELLOW + full_prompt + Style.RESET_ALL)
     print("-"*50)
     
     try:
-        # Create the streaming response with the second agent
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -145,6 +169,8 @@ def generate_script():
                 {"role": "user", "content": full_prompt}
             ],
             temperature=0.7,
+            max_tokens=112,
+            top_p=0.33,
             stream=True
         )
 
@@ -161,6 +187,25 @@ def generate_script():
                 full_response += content
         
         print("\n" + "-" * 50)
+       
+        # Keep shortening until we get a proper ending
+        max_attempts = 3
+        attempt = 0
+        current_script = full_response
+        
+        while not (current_script.strip().endswith('AlgoAlpha.') or 
+                  current_script.strip().endswith('by AlgoAlpha')):
+            attempt += 1
+            if attempt > max_attempts:
+                print("\nFailed to generate properly sized script after multiple attempts.")
+                break
+                
+            print(f"\nScript exceeded length limit. Shortening (Attempt {attempt})...\n" + "-"*50)
+            current_script = shorten_script(current_script, analysis)
+            print(Fore.WHITE + current_script + Style.RESET_ALL)
+            print("-"*50)
+
+        full_response = current_script
 
         # Detect which hook was used and save it
         used_hook = detect_used_hook(full_response, top_hooks)
