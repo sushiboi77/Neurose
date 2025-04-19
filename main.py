@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from colorama import init, Fore, Style
 import numpy as np
 import json
+import random
 
 # Initialize colorama
 init()
@@ -32,13 +33,13 @@ def load_used_hooks():
         return []
 
 def save_used_hooks(hook):
-    """Save the new hook while maintaining last 5 hooks"""
+    """Save the new hook while maintaining last 10 hooks"""
     used_hooks = load_used_hooks()
     used_hooks.append(hook)
     
-    # Keep only the last 5 hooks
-    if len(used_hooks) > 5:
-        used_hooks = used_hooks[-5:]
+    # Keep only the last 10 hooks
+    if len(used_hooks) > 10:
+        used_hooks = used_hooks[-10:]
         
     with open('used_hooks.json', 'w', encoding='utf-8') as f:
         json.dump(used_hooks, f, ensure_ascii=False, indent=2)
@@ -47,23 +48,18 @@ def get_top_hooks(analysis_text, num_hooks=5):
     # Load previously used hooks
     used_hooks = set(load_used_hooks())  # Convert to set for faster lookup
     
-    analysis_embedding = get_embedding(analysis_text)
-    
     with open('hook_embeddings.json', 'r', encoding='utf-8') as f:
         hook_embeddings = json.load(f)
     
-    # Calculate similarities and filter out used hooks
-    similarities = []
-    for hook_data in hook_embeddings:
-        if hook_data['hook'] not in used_hooks:  # Skip previously used hooks
-            similarity = cosine_similarity(analysis_embedding, hook_data['embedding'])
-            similarities.append((hook_data['hook'], similarity))
+    # Filter out previously used hooks
+    available_hooks = [hook_data['hook'] for hook_data in hook_embeddings 
+                      if hook_data['hook'] not in used_hooks]
     
-    # Sort by similarity and get top N
-    similarities.sort(key=lambda x: x[1], reverse=True)
-    selected_hooks = [hook for hook, _ in similarities[:num_hooks]]
-    
-    return selected_hooks
+    # Randomly select hooks
+    if len(available_hooks) <= num_hooks:
+        return available_hooks  # Return all available hooks if fewer than num_hooks
+    else:
+        return random.sample(available_hooks, num_hooks)
 
 def analyze_code(pinescript_code):
     with open('system messages/analysis.txt', 'r', encoding='utf-8') as file:
@@ -90,17 +86,24 @@ def detect_used_hook(output_text, provided_hooks):
     # Extract the hook from the output (text between [Hook] and [Body])
     try:
         hook_text = output_text.split("[Hook]")[1].split("[Body]")[0].strip()
+        print(f"\nExtracted Hook Text:\n{'-'*50}")
+        print(Fore.CYAN + hook_text + Style.RESET_ALL)
+        print('-'*50)
+        
         hook_embedding = get_embedding(hook_text)
         
-        # Compare with the 5 provided hooks
+        # Compare with the provided hooks
         similarities = []
+        print(f"\nHook Similarity Comparison:\n{'-'*50}")
         for hook in provided_hooks:
             hook_embedding_compare = get_embedding(hook)
             similarity = cosine_similarity(hook_embedding, hook_embedding_compare)
             similarities.append((hook, similarity))
+            print(Fore.MAGENTA + f"Score: {similarity:.4f} - {hook}" + Style.RESET_ALL)
         
         # Return the hook with highest similarity
         similarities.sort(key=lambda x: x[1], reverse=True)
+        print('-'*50)
         return similarities[0][0]  # Return the most similar hook
     except Exception as e:
         print(f"Error detecting used hook: {e}")
